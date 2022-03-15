@@ -1,47 +1,261 @@
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage,
+    TemplateSendMessage, ButtonsTemplate,
+    PostbackEvent,
+    LocationMessage, LocationSendMessage, StickerSendMessage, ImagemapSendMessage,
+    BaseSize, Video, ImagemapArea, ExternalLink, URIImagemapAction, MessageImagemapAction,
+    PostbackAction, MessageAction, URIAction, ConfirmTemplate, CarouselTemplate, CarouselColumn,
+    ImageCarouselTemplate, ImageCarouselColumn, FlexSendMessage, BubbleContainer, ImageComponent,
+    QuickReply, QuickReplyButton
+)
+from linebot import (
+    LineBotApi, WebhookHandler
+)
 import os
-import sys
 import logging
-
-from linebot import (LineBotApi, WebhookHandler)
-from linebot.models import (MessageEvent, TextMessage, TextSendMessage)
-from linebot.exceptions import (LineBotApiError, InvalidSignatureError)
-
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# 環境変数からLINEBotのチャンネルアクセストークンとシークレットを読み込む
-channel_secret = os.getenv('LINE_CHANNEL_SECRET')
-channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-
-# apiとhandlerの生成（チャンネルアクセストークンとシークレットを渡す）
-line_bot_api = LineBotApi(channel_access_token)
-handler = WebhookHandler(channel_secret)
-
-# Lambdaのメインの動作
+LINE_CHANNEL_ACCESS_TOKEN = os.environ['LINE_CHANNEL_ACCESS_TOKEN']
+LINE_CHANNEL_SECRET = os.environ['LINE_CHANNEL_SECRET']
+LINE_BOT_API = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+LINE_HANDLER = WebhookHandler(LINE_CHANNEL_SECRET)
 
 
 def lambda_handler(event, context):
-
     logger.info(event)
-
-# 認証用のx-line-signatureヘッダー
     signature = event["headers"]["x-line-signature"]
     body = event["body"]
 
-# テキストメッセージを受け取った時に呼ばれるイベント ================================
-    @handler.add(MessageEvent, message=TextMessage)
-    def message(line_event):
-
-        # ユーザー情報を取得
-        profile = line_bot_api.get_profile(line_event.source.user_id)
+    # テキストメッセージを受け取った時に呼ばれるイベント======================================
+    @LINE_HANDLER.add(MessageEvent, message=TextMessage)
+    def on_message(line_event):
+        # ユーザー情報を取得する
+        profile = LINE_BOT_API.get_profile(line_event.source.user_id)
         logger.info(profile)
-        logger.info(line_event)
-        text = line_event.message.text
-        line_bot_api.reply_message(
-            line_event.reply_token, TextSendMessage(text=text))
 
-    return {
-        "statusCode": 200,
-        "body": ""
+        message = line_event.message.text.lower()
+        # 受取ったメッセージに応じて、対応するメッセージオブジェクトを返却する。
+        if message == '位置情報':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, location_message)
+        elif message == 'スタンプ':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, sticker_message)
+        elif message == 'イメージマップ':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, imagemap_message)
+        elif message == 'ボタンテンプレート':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, buttons_template_message)
+        elif message == '確認テンプレート':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, confirm_template_message)
+        elif message == 'カルーセルテンプレート':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, carousel_template_message)
+        elif message == '画像テンプレート':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, image_carousel_template_message)
+        elif message == 'フレックスメッセージ':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, flex_message)
+        elif message == 'フレックスメッセージ2':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, flex_message2)
+        elif message == 'クイックリプライ':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, text_message)
+        else:
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, TextSendMessage("こんにちは！"))
+
+    LINE_HANDLER.handle(body, signature)
+    return 0
+    # ==================================================================================
+
+
+# 以下はMessage objects定義===============================================================
+location_message = LocationSendMessage(
+    title='my location',
+    address='Tokyo',
+    latitude=35.65910807942215,
+    longitude=139.70372892916203
+)
+sticker_message = StickerSendMessage(
+    package_id='1',
+    sticker_id='1'
+)
+
+imagemap_message = ImagemapSendMessage(
+    base_url='https://linebot-img.s3.ap-northeast-1.amazonaws.com/img/',
+    alt_text='this is an imagemap',
+    base_size=BaseSize(height=130, width=600),
+    actions=[
+        URIImagemapAction(
+            link_uri='https://www.google.com/',
+            area=ImagemapArea(
+                x=0, y=0, width=520, height=1040
+            )
+        ),
+        MessageImagemapAction(
+            text='hello',
+            area=ImagemapArea(
+                x=520, y=0, width=520, height=1040
+            )
+        )
+    ]
+)
+
+buttons_template_message = TemplateSendMessage(
+    alt_text='Buttons template',
+    template=ButtonsTemplate(
+        thumbnail_image_url='https://prtimes.jp/i/33692/1/resize/d33692-1-628976-0.jpg',
+        title='Menu',
+        text='Please select',
+        actions=[
+            PostbackAction(
+                label='postback',
+                display_text='postback text',
+                data='action=buy&itemid=1'
+            ),
+            MessageAction(
+                label='message',
+                text='message text'
+            ),
+            URIAction(
+                label='uri',
+                uri='http://example.com/'
+            )
+        ]
+    )
+)
+
+confirm_template_message = TemplateSendMessage(
+    alt_text='Confirm template',
+    template=ConfirmTemplate(
+        text='Are you sure?',
+        actions=[
+            PostbackAction(
+                label='postback',
+                display_text='postback text',
+                data='action=buy&itemid=1'
+            ),
+            MessageAction(
+                label='message',
+                text='message text'
+            )
+        ]
+    )
+)
+
+carousel_template_message = TemplateSendMessage(
+    alt_text='Carousel template',
+    template=CarouselTemplate(
+        columns=[
+            CarouselColumn(
+                thumbnail_image_url='https://pbs.twimg.com/profile_images/1194506255898820608/Ykq-vveX_400x400.jpg',
+                title='this is menu1',
+                text='description1',
+                actions=[
+                    PostbackAction(
+                        label='postback1',
+                        display_text='postback text1',
+                        data='action=buy&itemid=1'
+                    ),
+                    MessageAction(
+                        label='message1',
+                        text='message text1'
+                    ),
+                    URIAction(
+                        label='uri1',
+                        uri='http://example.com/1'
+                    )
+                ]
+            ),
+            CarouselColumn(
+                thumbnail_image_url='https://www.f-l-p.co.jp/wordpress/wp-content/uploads/2018/09/saison.png',
+                title='this is menu2',
+                text='description2',
+                actions=[
+                    PostbackAction(
+                        label='postback2',
+                        display_text='postback text2',
+                        data='action=buy&itemid=2'
+                    ),
+                    MessageAction(
+                        label='message2',
+                        text='message text2'
+                    ),
+                    URIAction(
+                        label='uri2',
+                        uri='http://example.com/2'
+                    )
+                ]
+            )
+        ]
+    )
+)
+image_carousel_template_message = TemplateSendMessage(
+    alt_text='ImageCarousel template',
+    template=ImageCarouselTemplate(
+        columns=[
+            ImageCarouselColumn(
+                image_url='https://pbs.twimg.com/profile_images/1194506255898820608/Ykq-vveX_400x400.jpg',
+                action=PostbackAction(
+                    label='postback1',
+                    display_text='postback text1',
+                    data='action=buy&itemid=1'
+                )
+            ),
+            ImageCarouselColumn(
+                image_url='https://www.f-l-p.co.jp/wordpress/wp-content/uploads/2018/09/saison.png',
+                action=PostbackAction(
+                    label='postback2',
+                    display_text='postback text2',
+                    data='action=buy&itemid=2'
+                )
+            )
+        ]
+    )
+)
+
+flex_message = FlexSendMessage(
+    alt_text='hello',
+    contents=BubbleContainer(
+        direction='ltr',
+        hero=ImageComponent(
+            url='https://example.com/cafe.jpg',
+            size='full',
+            aspect_ratio='20:13',
+            aspect_mode='cover',
+            action=URIAction(uri='http://example.com', label='label')
+        )
+    )
+)
+
+flex_message2 = FlexSendMessage(
+    alt_text='hello',
+    contents={
+        'type': 'bubble',
+        'direction': 'ltr',
+        'hero': {
+            'type': 'image',
+            'url': 'https://example.com/cafe.jpg',
+            'size': 'full',
+            'aspectRatio': '20:13',
+            'aspectMode': 'cover',
+            'action': {'type': 'uri', 'uri': 'http://example.com', 'label': 'label'}
+        }
     }
-# ================================================================================
+)
+
+text_message = TextSendMessage(
+    text='please select',
+    quick_reply=QuickReply(items=[
+        QuickReplyButton(action=MessageAction(
+            label="label", text="text")),
+        QuickReplyButton(action=MessageAction(
+            label="label2", text="text")),
+        QuickReplyButton(action=MessageAction(
+            label="label3", text="text"))
+    ]))
