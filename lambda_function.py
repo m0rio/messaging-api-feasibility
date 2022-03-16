@@ -6,7 +6,8 @@ from linebot.models import (
     BaseSize, Video, ImagemapArea, ExternalLink, URIImagemapAction, MessageImagemapAction,
     PostbackAction, MessageAction, URIAction, ConfirmTemplate, CarouselTemplate, CarouselColumn,
     ImageCarouselTemplate, ImageCarouselColumn, FlexSendMessage, BubbleContainer, ImageComponent,
-    QuickReply, QuickReplyButton
+    QuickReply, QuickReplyButton, DatetimePickerAction, RichMenu, RichMenuArea,
+    RichMenuBounds, RichMenuSize
 )
 from linebot import (
     LineBotApi, WebhookHandler
@@ -65,6 +66,9 @@ def lambda_handler(event, context):
         elif message == 'クイックリプライ':
             LINE_BOT_API.reply_message(
                 line_event.reply_token, text_message)
+        elif message == '日時選択':
+            LINE_BOT_API.reply_message(
+                line_event.reply_token, buttons_template_message_datetime)
         else:
             LINE_BOT_API.reply_message(
                 line_event.reply_token, TextSendMessage("こんにちは！"))
@@ -232,7 +236,7 @@ flex_message = FlexSendMessage(
         )
     )
 )
-
+# dictで設定できる。
 flex_message2 = FlexSendMessage(
     alt_text='hello',
     contents={
@@ -259,3 +263,65 @@ text_message = TextSendMessage(
         QuickReplyButton(action=MessageAction(
             label="label3", text="text"))
     ]))
+
+buttons_template_message_datetime = TemplateSendMessage(
+    alt_text='Buttons template',
+    template=ButtonsTemplate(
+        thumbnail_image_url='https://prtimes.jp/i/33692/1/resize/d33692-1-628976-0.jpg',
+        title='日時選択',
+        text='Please select',
+        actions=[
+            DatetimePickerAction(
+                type="datetimepicker",
+                label="Select date",
+                data="storeId=12345",
+                mode="datetime",
+                initial="2017-12-25t00:00",
+                max="2018-01-24t23:59",
+                min="2017-12-25t00:00"
+            )
+        ]
+    )
+)
+
+# リッチメニュー===================================================
+rich_menu_to_create = RichMenu(
+    # 全体のサイズを設定できます。widthは幅、heightは高さを表します。
+    # sizeが2500×1686, 2500×843, 1200×810, 1200×405, 800×540, 800×270のみ
+    size=RichMenuSize(width=1200, height=405),
+    # デフォルトでリッチメニューを表示するならTrueにしましょう。
+    selected=True,
+    # ユーザには表示されないリッチメニューの名前です。リッチメニューの管理に役立ちます。
+    name='richmenu',
+    # チャットバーに表示されるテキストです。
+    chat_bar_text='メニュー',
+    # タップ領域の座標とサイズを定義します。
+    areas=[
+        RichMenuArea(
+            bounds=RichMenuBounds(x=0, y=0, width=1273, height=868),
+            action=MessageAction(
+                label='1',
+                text='1'
+            )
+        ),
+        RichMenuArea(
+            bounds=RichMenuBounds(x=1278, y=0, width=1211, height=864),
+            action=PostbackAction(data='deadline')
+        ),
+        RichMenuArea(
+            bounds=RichMenuBounds(x=0, y=864, width=1268, height=818),
+            action=PostbackAction(data="not_submitted")
+        ),
+        RichMenuArea(
+            bounds=RichMenuBounds(x=1273, y=877, width=1227, height=805),
+            action=PostbackAction(data="forget")
+        )
+    ]
+)
+richMenuId = LINE_BOT_API.create_rich_menu(rich_menu=rich_menu_to_create)
+# 画像のアップロード
+with open("img/menu.png", 'rb') as f:
+    LINE_BOT_API.set_rich_menu_image(richMenuId, "image/png", f)
+# リッチメニューを設置
+LINE_BOT_API.set_default_rich_menu(richMenuId)
+# ===================================================================================
